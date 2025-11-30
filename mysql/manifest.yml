@@ -48,7 +48,16 @@ spec:
       - name: mysql                          # Logical name of the container
         image: venkatesh990/mysql:v1           # MySQL Docker image
         imagePullPolicy: Always              # Always pull the latest image
-
+        # readinessProbe:
+        #   tcpSocket:
+        #     port: 3306
+        #   initialDelaySeconds: 10
+        #   periodSeconds: 10
+        # livenessProbe:
+        #   tcpSocket:
+        #     port: 3306
+        #   initialDelaySeconds: 20
+        #   periodSeconds: 5
         # Readiness and liveness probes are commented out here.
         # You can enable them after the DB initialization delay is known.
 
