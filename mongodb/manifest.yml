@@ -1,0 +1,72 @@
+# -----------------------------
+# MongoDB Deployment
+# -----------------------------
+
+apiVersion: apps/v1            # API version used for Deployment resources
+kind: Deployment               # We are creating a Deployment (manages Pods)
+metadata:
+  name: mongodb                # Name of the Deployment
+  namespace: roboshop          # Deployment will be created in 'roboshop' namespace
+  labels:                      # Labels to identify this Deployment
+    project: roboshop          # Project label (used for grouping resources)
+    component: mongodb         # Component name (MongoDB)
+    tier: db                   # Tier of application (Database layer)
+
+spec:
+  replicas: 1                  # Number of pod replicas (Single MongoDB instance)
+  selector:                    # Deployment uses this selector to manage Pods
+    matchLabels:               # It selects Pods matching these labels
+      project: roboshop        # Must match Pod's "project" label
+      component: mongodb       # Must match Pod's "component" label
+      tier: db                 # Must match Pod's "tier" label
+
+  template:                    # Pod template — defines how each Pod should look
+    metadata:
+      labels:                  # Labels applied to Pods created by this Deployment
+        project: roboshop      # Same labels used in selector above
+        component: mongodb     # Ensures Deployment controls the Pod
+        tier: db               # Ensures Service finds this Pod
+
+    spec:
+      containers:              # List of containers in this Pod
+      - name: mongodb          # Logical name of the container
+        image: venkatesh990/mongodb:v1     # Docker image used for MongoDB
+        imagePullPolicy: Always          # Always pull the latest image version
+
+        readinessProbe:        # Kubernetes checks if container is READY to serve traffic
+          tcpSocket:           # Readiness done via TCP socket check
+            port: 27017        # MongoDB default port—must accept connections
+          initialDelaySeconds: 10  # Wait 10 seconds before starting readiness checks
+          periodSeconds: 10        # Check readiness every 10 seconds
+
+        livenessProbe:         # Kubernetes checks if container is ALIVE
+          tcpSocket:           # Liveness also done via TCP socket check
+            port: 27017        # If TCP fails → container restarts automatically
+          initialDelaySeconds: 5   # First liveness check after 5 seconds
+          periodSeconds: 5         # Check liveness every 5 seconds
+
+---
+# -----------------------------
+# MongoDB Service
+# -----------------------------
+
+apiVersion: v1                 # API version for Service resources
+kind: Service                  # We are creating a Service (stable networking endpoint)
+
+metadata:
+  name: mongodb                # Name of the Service
+  namespace: roboshop          # Service belongs to 'roboshop' namespace
+
+spec:
+  selector:                    # Service forwards traffic to Pods matching these labels
+    project: roboshop          # Helps Kubernetes find the correct Pod(s)
+    component: mongodb         # Ensures traffic goes only to MongoDB Pod
+    tier: db                   # Matches Deployment Pod labels
+
+  ports:
+    - protocol: TCP            # MongoDB uses TCP communication
+      port: 27017              # Service port inside the cluster (stable endpoint)
+      targetPort: 27017        # Actual port inside MongoDB container
+
+      # No type specified → default is ClusterIP
+      # ClusterIP means: accessible only inside the cluster (secure for DB)

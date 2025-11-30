@@ -1,0 +1,15 @@
+apiVersion: v1                # API version for creating a Pod
+kind: Pod                     # We are creating a Pod resource
+
+metadata:
+  name: debug                 # Name of the Pod
+  namespace: roboshop         # Pod will be created inside 'roboshop' namespace
+  labels:                     # Labels help identify and select the Pod
+    name: debug               # Label key-value pair
+    project: roboshop         # Used for grouping and selectors
+
+spec:
+  containers:                 # List of containers inside this Pod
+  - name: debug               # Container name (logical name)
+    image: venkatesh990/debug:v1   # Docker image to run inside this Pod
+    imagePullPolicy: Always        # Always pull the latest image version
