@@ -10,9 +10,9 @@ metadata:
 data:
   CART_ENDPOINT: "cart:8080"
   DB_HOST: "mysql"
-  DB_USER: "roboshop"
-  DB_PASS: "roboshop123"
-  DB_NAME: "shipping"
+  # DB_USER: "roboshop"
+  # DB_PASS: "roboshop123"
+  # DB_NAME: "shipping"
 ---
 # -----------------------------------------
 # Shipping Deployment
