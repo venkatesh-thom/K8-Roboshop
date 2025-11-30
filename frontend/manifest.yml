@@ -1,0 +1,75 @@
+# -----------------------------
+# Frontend Deployment
+# -----------------------------
+apiVersion: apps/v1                    # API version used for Deployment resources
+kind: Deployment                       # We are creating a Deployment
+
+metadata:
+  name: frontend                       # Name of the Deployment
+  namespace: roboshop                  # Deployment will run inside 'roboshop' namespace
+  labels:                              # Labels used by Deployment & ReplicaSet
+    project: roboshop                  # Project label (used for grouping)
+    component: frontend                # Component label = frontend service
+    tier: frontend                     # Tier = frontend/UI layer
+
+spec:
+  replicas: 1                          # Number of frontend pod replicas
+  selector:                            # Deployment will manage pods matching:
+    matchLabels:                       # Must match pod template labels exactly
+      project: roboshop
+      component: frontend
+      tier: frontend
+
+  template:                            # Pod template → defines each pod's spec
+    metadata:
+      labels:                          # Labels applied to pods created by Deployment
+        project: roboshop
+        component: frontend
+        tier: frontend
+    
+    spec:
+      containers:                      # List of containers inside the pod
+      - name: frontend                 # Logical name of the container
+        image: venkatesh990/frontend:v1  # Docker image for frontend UI service
+        imagePullPolicy: Always        # Always pull latest image version when starting
+
+        ports:                         # Ports exposed by the container
+        - name: liveness-port          # Named port for health checks
+          containerPort: 80            # Nginx/frontend runs on port 80
+
+        readinessProbe:                # Determines if pod is ready to receive traffic
+          httpGet:                     # Uses HTTP GET probe
+            path: /                    # Probes root path of the web server
+            port: liveness-port        # Uses named container port
+          failureThreshold: 1          # One failure marks pod as unready
+          periodSeconds: 15            # Check readiness every 15 seconds
+
+        livenessProbe:                 # Determines if container is still healthy/alive
+          httpGet:
+            path: /                    # Same root path check
+            port: liveness-port        # Using named port
+          failureThreshold: 1          # One error → container restart
+          periodSeconds: 15            # Check every 15 seconds
+
+---
+# -----------------------------
+# Frontend Service
+# -----------------------------
+apiVersion: v1                         # API version for Service resources
+kind: Service                          # We are creating a Service
+
+metadata:
+  name: frontend                       # Name of the Service
+  namespace: roboshop                  # Service belongs to 'roboshop' namespace
+
+spec:
+  type: LoadBalancer                   # Creates an External Load Balancer (internet-facing)
+  selector:                            # Service forwards traffic to pods with:
+    project: roboshop
+    component: frontend
+    tier: frontend
+
+  ports:
+    - protocol: TCP                    # Frontend communicates over TCP
+      port: 80                         # Service port (external + internal)
+      targetPort: 80                   # Container port where frontend app listens

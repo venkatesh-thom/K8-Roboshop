@@ -1,0 +1,95 @@
+# -----------------------------
+# ConfigMap for Catalogue Service
+# -----------------------------
+apiVersion: v1                           # API version for ConfigMap resources
+kind: ConfigMap                          # Declaring this resource as a ConfigMap
+
+metadata:
+  name: catalogue                        # Name of the ConfigMap
+  namespace: roboshop                    # ConfigMap belongs to 'roboshop' namespace
+
+data:                                     # Key-value pairs (used as environment variables)
+  MONGO: "true"                           # Tells the app to use MongoDB
+  MONGO_URL: "mongodb://mongodb:27017/catalogue"  
+                                          # MongoDB connection string (DB: catalogue)
+
+---
+# -----------------------------
+# Catalogue Deployment
+# -----------------------------
+apiVersion: apps/v1                       # API version for Deployment resources
+kind: Deployment                          # Declaring this resource as a Deployment
+
+metadata:
+  name: catalogue                         # Name of the Deployment
+  namespace: roboshop                     # Deployment belongs to 'roboshop' namespace
+  labels:                                 # Labels used by the replica set
+    project: roboshop                     # Project label
+    component: catalogue                  # Component name = catalogue service
+    tier: backend                         # Specifies backend tier
+
+spec:
+  replicas: 1                              # Number of catalogue pod replicas
+  selector:                                # Deployment manages pods with these labels
+    matchLabels:
+      project: roboshop                    # Must match pod template label
+      component: catalogue
+      tier: backend
+
+  template:                                 # Pod specification template
+    metadata:
+      labels:                               # Labels applied to the pod
+        project: roboshop                   # Must match selector above
+        component: catalogue
+        tier: backend
+
+    spec:
+      containers:                           # List of containers inside this pod
+      - name: catalogue                     # Logical container name
+        image: venkatesh990/catalogue:v1      # Docker image for Catalogue microservice
+        imagePullPolicy: Always             # Always pull image when pod starts
+
+        envFrom:                             # Load environment variables from ConfigMap
+        - configMapRef:
+            name: catalogue                 # Name of the ConfigMap
+
+        ports:                               # Ports exposed by this container
+        - name: liveness-port                # Named port used in readiness/liveness
+          containerPort: 8080                # App listens on port 8080
+
+        readinessProbe:                      # Checks if container is READY to serve traffic
+          httpGet:                           # Uses HTTP GET request
+            path: /health                    # Health endpoint
+            port: liveness-port              # Uses named port above
+          failureThreshold: 1                # One failure marks pod as unready
+          periodSeconds: 15                  # Check every 15 seconds
+
+        livenessProbe:                       # Checks if container is ALIVE
+          httpGet:
+            path: /health                    # Same health endpoint
+            port: liveness-port              # Uses named port
+          failureThreshold: 1                # One failure = restart container
+          periodSeconds: 15                  # Run check every 15 seconds
+
+---
+# -----------------------------
+# Catalogue Service
+# -----------------------------
+apiVersion: v1                             # API version for Service resources
+kind: Service                              # Declaring this resource as a Service
+
+metadata:
+  name: catalogue                           # Name of the Service
+  namespace: roboshop                       # Belongs to 'roboshop' namespace
+
+spec:
+  selector:                                 # Service sends traffic to pods with these labels
+    project: roboshop                       # Must match Deployment pod labels
+    component: catalogue
+    tier: backend
+
+  ports:
+    - protocol: TCP                         # Catalogue uses TCP protocol
+      port: 8080                            # Service port inside cluster (stable endpoint)
+      targetPort: 8080                      # Port exposed by the catalogue container
+      # Default type = ClusterIP (internal access only)

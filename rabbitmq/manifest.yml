@@ -1,0 +1,75 @@
+# -----------------------------
+# RabbitMQ Deployment
+# -----------------------------
+apiVersion: apps/v1                        # API version for Deployment resources
+kind: Deployment                           # We are creating a Deployment
+
+metadata:
+  name: rabbitmq                           # Name of the Deployment
+  namespace: roboshop                      # Deployment will run inside 'roboshop' namespace
+  labels:                                  # Labels applied to Deployment and ReplicaSet
+    project: roboshop                      # Project identifier
+    component: rabbitmq                    # Component = rabbitmq service
+    tier: db                               # Tier = database/message broker layer
+
+spec:
+  replicas: 1                               # Number of RabbitMQ pod replicas
+  selector:                                 # Deployment selects pods using labels below
+    matchLabels:
+      project: roboshop                     # Must match template labels
+      component: rabbitmq
+      tier: db
+
+  template:                                 # Pod template → defines the container spec
+    metadata:
+      labels:                               # Labels applied to pods created by Deployment
+        project: roboshop
+        component: rabbitmq
+        tier: db
+
+    spec:
+      containers:                           # List of containers inside pod
+      - name: rabbitmq                      # Name of the RabbitMQ container
+        image: rabbitmq:3                   # Official RabbitMQ image (version 3)
+        imagePullPolicy: Always             # Always pull the latest version of this tag
+
+        env:                                # Environment variables passed to the container
+        - name: RABBITMQ_DEFAULT_USER       # RabbitMQ default username
+          value: roboshop
+        - name: RABBITMQ_DEFAULT_PASS       # RabbitMQ default password
+          value: roboshop123                # (Can be moved to Secret for security)
+
+        readinessProbe:                     # Checks if RabbitMQ is ready to accept traffic
+          tcpSocket:                        # TCP probe instead of HTTP
+            port: 5672                      # RabbitMQ main port for AMQP
+          initialDelaySeconds: 15           # Start checking after 15 seconds
+          periodSeconds: 10                 # Check every 10 seconds
+
+        livenessProbe:                      # Checks if container is alive
+          tcpSocket:
+            port: 5672                      # Same AMQP port for health check
+          initialDelaySeconds: 20           # Start checking after 20 seconds
+          periodSeconds: 5                  # Run check every 5 seconds
+
+---
+# -----------------------------
+# RabbitMQ Service
+# -----------------------------
+apiVersion: v1                              # API version for Service
+kind: Service                               # We are creating a Service
+
+metadata:
+  name: rabbitmq                            # Name of the Service
+  namespace: roboshop                       # Service belongs to 'roboshop' namespace
+
+spec:
+  selector:                                  # Route traffic to pods matching these labels:
+    project: roboshop
+    component: rabbitmq
+    tier: db
+
+  ports:
+    - protocol: TCP                          # RabbitMQ uses TCP protocol
+      port: 5672                             # Service port inside cluster
+      targetPort: 5672                       # RabbitMQ container port (AMQP)
+      # Default Service type = ClusterIP (internal only)

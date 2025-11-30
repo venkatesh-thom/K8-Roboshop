@@ -1,0 +1,69 @@
+# -----------------------------
+# Redis Deployment
+# -----------------------------
+apiVersion: apps/v1                        # API version for Deployment resources
+kind: Deployment                           # We are creating a Deployment resource
+
+metadata:
+  name: redis                              # Name of the Deployment
+  namespace: roboshop                      # Deployment belongs to 'roboshop' namespace
+  labels:                                  # Labels applied to Deployment and ReplicaSet
+    project: roboshop                      # Project label for grouping
+    component: redis                       # Component label = redis
+    tier: db                               # This is a database/cache tier component
+
+spec:
+  replicas: 1                               # Run 1 Redis pod
+  selector:                                 # Deployment matches pods with these labels
+    matchLabels:
+      project: roboshop                     # Must match labels in pod template
+      component: redis
+      tier: db
+
+  template:                                 # Pod template definition
+    metadata:
+      labels:                               # Labels applied to pods created by Deployment
+        project: roboshop
+        component: redis
+        tier: db
+
+    spec:
+      containers:                           # List of containers inside the pod
+      - name: redis                         # Name of the Redis container
+        image: redis:7.0                    # Official Redis 7.0 image
+        imagePullPolicy: Always             # Always pull the latest version of this tag
+
+        readinessProbe:                     # Checks if Redis is READY to serve traffic
+          tcpSocket:                        # Using TCP socket check instead of HTTP
+            port: 6379                      # Redis default port
+          initialDelaySeconds: 10           # Start checking after 10 seconds
+          periodSeconds: 10                 # Check readiness every 10 seconds
+
+        livenessProbe:                      # Checks if Redis container is ALIVE
+          tcpSocket:
+            port: 6379                      # Same Redis TCP port
+          initialDelaySeconds: 5            # Start liveness checks after 5 seconds
+          periodSeconds: 5                  # Check every 5 seconds
+          
+---
+# -----------------------------
+# Redis Service
+# -----------------------------
+apiVersion: v1                              # API version for Service resources
+kind: Service                               # We are creating a Service
+
+metadata:
+  name: redis                               # Name of the Service
+  namespace: roboshop                       # Service belongs to 'roboshop' namespace
+
+spec:
+  selector:                                  # Service forwards traffic to pods matching:
+    project: roboshop
+    component: redis
+    tier: db
+
+  ports:
+    - protocol: TCP                          # Redis uses TCP protocol
+      port: 6379                             # Service port inside cluster
+      targetPort: 6379                       # Container port exposed by Redis pod
+      # Default type = ClusterIP (internal only)

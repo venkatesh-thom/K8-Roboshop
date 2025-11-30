@@ -1,0 +1,99 @@
+# -----------------------------
+# Payment ConfigMap
+# -----------------------------
+apiVersion: v1                          # API version for ConfigMap
+kind: ConfigMap                         # Declaring this resource as a ConfigMap
+
+metadata:
+  name: payment                         # Name of the ConfigMap
+  namespace: roboshop                   # ConfigMap belongs to 'roboshop' namespace
+
+data:                                    # Key-value pairs used as environment variables
+  CART_HOST: "cart"                      # Hostname of Cart service
+  CART_PORT: "8080"                      # Port of Cart service
+  USER_HOST: "user"                      # Hostname of User service
+  USER_PORT: "8080"                      # Port of User service
+  AMQP_HOST: "rabbitmq"                  # Hostname of RabbitMQ service
+  AMQP_USER: "roboshop"                  # RabbitMQ username
+  AMQP_PASS: "roboshop123"               # RabbitMQ password (hardcoded — can be moved to Secret)
+  
+---
+# -----------------------------
+# Payment Deployment
+# -----------------------------
+apiVersion: apps/v1                      # API version for Deployment
+kind: Deployment                         # Declaring this as a Deployment resource
+
+metadata:
+  name: payment                          # Name of the Deployment
+  namespace: roboshop                    # Deployment belongs to 'roboshop' namespace
+  labels:                                # Labels applied to Deployment and ReplicaSet
+    project: roboshop                    # Project grouping label
+    component: payment                   # Component name = payment service
+    tier: backend                        # Backend tier of the application
+
+spec:
+  replicas: 1                             # Number of payment pods to run
+  selector:                               # Deployment selects pods with these labels
+    matchLabels:
+      project: roboshop                   # Must match pod template labels
+      component: payment
+      tier: backend
+
+  template:                                # Pod template definition
+    metadata:
+      labels:                              # Labels assigned to pods created by Deployment
+        project: roboshop
+        component: payment
+        tier: backend
+
+    spec:
+      containers:                          # List of containers running inside each pod
+      - name: payment                      # Logical name of the payment container
+        image: venkatesh990/payment:v1       # Docker image for payment service
+        imagePullPolicy: Always            # Always pull latest image version on pod start
+
+        envFrom:                            # Load environment variables from ConfigMap
+        - configMapRef:
+            name: payment                  # Reference to ConfigMap named "payment"
+
+        ports:                              # Ports exposed by this container
+        - name: liveness-port               # Name for port used in probes
+          containerPort: 8080               # Application listens on port 8080
+
+        readinessProbe:                     # Checks if app is ready to serve requests
+          httpGet:                          # Perform HTTP GET request
+            path: /health                   # Health endpoint path
+            port: liveness-port             # Named container port
+          failureThreshold: 1               # 1 failed check marks pod as unready
+          periodSeconds: 15                 # Check readiness every 15 seconds
+
+        livenessProbe:                      # Checks if container is alive
+          httpGet:
+            path: /health                   # Endpoint to check liveness
+            port: liveness-port             # Uses named port
+          failureThreshold: 1               # Restart container after 1 failure
+          periodSeconds: 15                 # Check every 15 seconds
+
+---
+# -----------------------------
+# Payment Service
+# -----------------------------
+apiVersion: v1                            # API version for Service
+kind: Service                             # Declaring a Service resource
+
+metadata:
+  name: payment                           # Name of the Service
+  namespace: roboshop                     # Service belongs to 'roboshop' namespace
+
+spec:
+  selector:                                # Service forwards traffic to pods with:
+    project: roboshop
+    component: payment
+    tier: backend
+
+  ports:
+    - protocol: TCP                        # Payment service uses TCP protocol
+      port: 8080                           # Cluster-wide service port
+      targetPort: 8080                     # Port exposed by payment container
+      # Default type = ClusterIP (internal-only service)

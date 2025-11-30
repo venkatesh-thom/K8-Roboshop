@@ -1,0 +1,94 @@
+# -----------------------------
+# ConfigMap for Cart Service
+# -----------------------------
+apiVersion: v1                      # API version for ConfigMap resources
+kind: ConfigMap                     # We are creating a ConfigMap 
+metadata:
+  name: cart                        # Name of the ConfigMap
+  namespace: roboshop               # Stored inside the 'roboshop' namespace
+
+data:                               # Key-value pairs used as environment variables
+  REDIS_HOST: "redis"               # Hostname of Redis service
+  CATALOGUE_HOST: "catalogue"       # Hostname of Catalogue service
+  CATALOGUE_PORT: "8080"            # Catalogue service port (string required)
+  
+---
+# -----------------------------
+# Cart Deployment
+# -----------------------------
+apiVersion: apps/v1                 # API version for Deployment
+kind: Deployment                    # We are creating a Deployment
+
+metadata:
+  name: cart                        # Name of the Deployment
+  namespace: roboshop               # Deployment belongs to 'roboshop' namespace
+  labels:                           # Labels to identify replica set groups
+    project: roboshop               # Project name label
+    component: cart                 # Component name = cart service
+    tier: backend                   # Backend service tier
+
+spec:
+  replicas: 1                       # Number of cart pod replicas
+  selector:                         # Deployment selects pods using these labels
+    matchLabels:
+      project: roboshop             # Must match Pod's project label
+      component: cart               # Must match Pod's component label
+      tier: backend                 # Must match Pod's tier label
+
+  template:                         # Pod template
+    metadata:
+      labels:                       # Labels applied to Pods created by Deployment
+        project: roboshop           # Same label set for matching
+        component: cart             # Ensures correct service routing
+        tier: backend               # Identifies backend tier
+
+    spec:
+      containers:                   # List of containers inside the pod
+      - name: cart                  # Container name
+        image: venkatesh990/cart:v1   # Docker image for Cart service
+        imagePullPolicy: Always     # Always pull latest image version
+
+        envFrom:                    # Load all ConfigMap values as environment variables
+        - configMapRef:
+            name: cart              # Reference to our ConfigMap named "cart"
+
+        ports:                      # Ports exposed by this container
+        - name: liveness-port       # Logical name for the port (used in probes)
+          containerPort: 8080       # Application listens on port 8080
+
+        readinessProbe:             # Readiness probe → checks if container is ready
+          httpGet:                  # Uses HTTP GET request
+            path: /health           # Endpoint for health status
+            port: liveness-port     # Probe uses the named port
+          failureThreshold: 1       # 1 failed check = marked unready
+          periodSeconds: 15         # Check readiness every 15 seconds
+
+        livenessProbe:              # Liveness probe → checks if container is alive
+          httpGet:
+            path: /health           # Same health endpoint
+            port: liveness-port     # Uses named port
+          failureThreshold: 1       # 1 failure = container restart
+          periodSeconds: 15         # Check every 15 seconds
+
+---
+# -----------------------------
+# Cart Service
+# -----------------------------
+apiVersion: v1                      # API version for Service
+kind: Service                       # We are creating a Service
+
+metadata:
+  name: cart                        # Name of the Service
+  namespace: roboshop               # Belongs to 'roboshop' namespace
+
+spec:
+  selector:                         # Service routes traffic to Pods matching:
+    project: roboshop               # Label selectors must match Pod labels
+    component: cart
+    tier: backend
+
+  ports:
+    - protocol: TCP                 # Cart communicates using TCP
+      port: 8080                    # Service port inside the cluster
+      targetPort: 8080              # Container port inside the pod (cart app)
+      # No type specified → default ClusterIP (internal access only)

@@ -1,0 +1,94 @@
+# -----------------------------
+# Shipping ConfigMap
+# -----------------------------
+apiVersion: v1                            # API version for ConfigMap resources
+kind: ConfigMap                           # Declares this as a ConfigMap
+
+metadata:
+  name: shipping                          # Name of the ConfigMap
+  namespace: roboshop                     # ConfigMap belongs to 'roboshop' namespace
+
+data:                                      # Key-value pairs used as environment variables
+  CART_ENDPOINT: "cart:8080"               # Shipping service calls Cart service on port 8080
+  DB_HOST: "mysql"                         # MySQL hostname (service name)
+  
+---
+# -----------------------------
+# Shipping Deployment
+# -----------------------------
+apiVersion: apps/v1                        # API version for Deployment resources
+kind: Deployment                           # Declares this object as a Deployment
+
+metadata:
+  name: shipping                           # Name of the Deployment
+  namespace: roboshop                      # Deployment belongs to 'roboshop' namespace
+  labels:                                  # Labels applied to Deployment & ReplicaSet
+    project: roboshop                      # Project identifier
+    component: shipping                    # Component name = shipping service
+    tier: backend                          # Application tier = backend
+
+spec:
+  replicas: 1                               # Number of shipping pods to run
+  selector:                                 # Deployment will manage pods with these labels
+    matchLabels:
+      project: roboshop                     # Must match pod template labels
+      component: shipping
+      tier: backend
+
+  template:                                  # Pod definition template
+    metadata:
+      labels:                                # Labels applied to generated Pods
+        project: roboshop
+        component: shipping
+        tier: backend
+
+    spec:
+      containers:                            # List of containers inside the pod
+      - name: shipping                       # Name of the container
+        image: venkatesh990/shipping:v1        # Docker image for the shipping microservice
+        imagePullPolicy: Always              # Always pull latest image when pod is created
+
+        envFrom:                              # Inject all key-values from ConfigMap as env variables
+        - configMapRef:
+            name: shipping                   # ConfigMap name to load vars from
+
+        ports:                                # Ports exposed by the container
+        - name: liveness-port                 # Name used for probe reference
+          containerPort: 8080                 # Application listens on port 8080
+
+        readinessProbe:                       # Checks if container is READY to serve traffic
+          httpGet:                            # Performs HTTP GET request
+            path: /health                     # Health endpoint
+            port: liveness-port               # Uses named port defined above
+          failureThreshold: 1                 # 1 failure marks pod as unready
+          periodSeconds: 15                   # Runs every 15 seconds
+
+        livenessProbe:                        # Checks if container is ALIVE (self-healing)
+          httpGet:
+            path: /health                     # Same health endpoint
+            port: liveness-port               # Named port
+          failureThreshold: 1                 # 1 failure → container restarts
+          periodSeconds: 15                   # Runs every 15 seconds
+
+---
+# -----------------------------
+# Shipping Service
+# -----------------------------
+apiVersion: v1                              # API version for Service resources
+kind: Service                               # Declares this object as a Service
+
+metadata:
+  name: shipping                            # Name of the Service
+  namespace: roboshop                       # Belongs to 'roboshop' namespace
+
+spec:
+  selector:                                  # Service routes traffic to pods with:
+    project: roboshop
+    component: shipping
+    tier: backend
+
+  ports:
+    - protocol: TCP                          # Shipping service uses TCP for communication
+      port: 8080                             # Service port exposed inside cluster
+      targetPort: 8080                       # Container port exposed by the pod
+      # Default type = ClusterIP → internal service only

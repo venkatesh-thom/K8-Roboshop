@@ -1,0 +1,96 @@
+# -----------------------------
+# User ConfigMap
+# -----------------------------
+apiVersion: v1                            # API version for ConfigMap resources
+kind: ConfigMap                           # Declaring a ConfigMap object
+
+metadata:
+  name: user                              # Name of the ConfigMap
+  namespace: roboshop                     # Namespace where the ConfigMap will live
+
+data:                                      # Key-value pairs used as environment variables
+  MONGO: "true"                            # Tells application to use MongoDB
+  REDIS_URL: "redis://redis:6379"          # Redis connection URL (used for sessions/caching)
+  MONGO_URL: "mongodb://mongodb:27017/users"
+                                           # MongoDB connection string for user database
+
+---
+# -----------------------------
+# User Deployment
+# -----------------------------
+apiVersion: apps/v1                        # API version for Deployment resources
+kind: Deployment                           # Declaring this object as a Deployment
+
+metadata:
+  name: user                               # Name of the Deployment
+  namespace: roboshop                      # Deployment belongs to 'roboshop' namespace
+  labels:                                  # Labels applied to Deployment & ReplicaSet
+    project: roboshop                      # Project label
+    component: user                        # Component = user service
+    tier: backend                          # Backend service tier
+
+spec:
+  replicas: 1                               # Number of User service pods to run
+  selector:                                 # Deployment selects pods based on these labels
+    matchLabels:
+      project: roboshop                     # Must match pod template labels
+      component: user
+      tier: backend
+
+  template:                                  # Pod template (blueprint for pod creation)
+    metadata:
+      labels:                                # Labels assigned to pods created by Deployment
+        project: roboshop
+        component: user
+        tier: backend
+
+    spec:
+      containers:                            # List of containers inside the pod
+      - name: user                           # Name of the container
+        image: venkatesh990/user:v1            # User microservice image
+        imagePullPolicy: Always              # Always pull the latest image version
+
+        envFrom:                              # Load environment variables from ConfigMap
+        - configMapRef:
+            name: user                       # Reference to ConfigMap named "user"
+
+        ports:                                # Container ports exposed
+        - name: liveness-port                 # Named port for readiness & liveness probes
+          containerPort: 8080                 # Application listens on port 8080
+
+        readinessProbe:                       # Checks if the container is READY
+          httpGet:                            # Performs HTTP GET request
+            path: /health                     # Health endpoint path
+            port: liveness-port               # Named container port
+          failureThreshold: 1                 # 1 failed check marks pod as unready
+          periodSeconds: 15                   # Check every 15 seconds
+
+        livenessProbe:                        # Checks if the container is ALIVE (self-healing)
+          httpGet:
+            path: /health                     # Same health endpoint
+            port: liveness-port               # Uses named container port
+          failureThreshold: 1                 # Restart container after 1 failed check
+          periodSeconds: 15                   # Probe every 15 seconds
+
+---
+# -----------------------------
+# User Service
+# -----------------------------
+apiVersion: v1                              # API version for Service resources
+kind: Service                               # Declaring this object as a Service
+
+metadata:
+  name: user                                # Name of the Service
+  namespace: roboshop                       # Service belongs to 'roboshop' namespace
+
+spec:
+  selector:                                  # Service routes traffic to matching pods
+    project: roboshop
+    component: user
+    tier: backend
+
+  ports:
+    - protocol: TCP                          # User service uses TCP protocol
+      port: 8080                             # Service port (Cluster-wide stable port)
+      targetPort: 8080                       # Container port exposed by user microservice
+      # Default service type = ClusterIP (internal-use only)

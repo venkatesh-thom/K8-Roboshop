@@ -1,0 +1,86 @@
+# -----------------------------
+# MySQL ConfigMap
+# -----------------------------
+apiVersion: v1                          # API version for ConfigMap
+kind: ConfigMap                          # We are creating a ConfigMap
+
+metadata:
+  name: mysql                            # Name of this ConfigMap
+  namespace: roboshop                    # ConfigMap belongs to 'roboshop' namespace
+
+data:                                    # Key-value pairs stored in ConfigMap
+  my.cnf: |                               # Multi-line value (MySQL custom config)
+    [mysqld]                              # MySQL server section
+    innodb_redo_log_capacity = 2G         # Custom MySQL configuration parameter
+
+---
+# -----------------------------
+# MySQL Deployment
+# -----------------------------
+apiVersion: apps/v1                       # API version for Deployment
+kind: Deployment                          # We are creating a Deployment
+
+metadata:
+  name: mysql                             # Deployment name
+  namespace: roboshop                     # Deployment belongs to 'roboshop' namespace
+  labels:                                 # Labels applied to Deployment
+    project: roboshop                     # Project identifier
+    component: mysql                      # Component name
+    tier: db                              # Database tier
+
+spec:
+  replicas: 1                              # Number of MySQL pod replicas
+  selector:                                # Deployment selects pods using labels below
+    matchLabels:
+      project: roboshop                    # Must match pod template labels
+      component: mysql
+      tier: db
+
+  template:                                 # Pod specification template
+    metadata:
+      labels:                               # Labels applied to pods created by Deployment
+        project: roboshop
+        component: mysql
+        tier: db
+
+    spec:
+      containers:                           # List of containers inside the pod
+      - name: mysql                          # Logical name of the container
+        image: venkatesh990/mysql:v1           # MySQL Docker image
+        imagePullPolicy: Always              # Always pull the latest image
+
+        # Readiness and liveness probes are commented out here.
+        # You can enable them after the DB initialization delay is known.
+
+        volumeMounts:                         # Mount volumes inside container
+        - name: mysql-config                   # Reference to the volume defined below
+          mountPath: /etc/mysql/conf.d/my.cnf  # Path where config will be mounted
+          subPath: my.cnf                      # Only this file from ConfigMap is mounted
+
+      volumes:                                 # Volumes available to the Pod
+        - name: mysql-config                    # Volume name referenced above
+          configMap:                            # Volume is sourced from ConfigMap
+            name: mysql                         # ConfigMap name
+
+---
+# -----------------------------
+# MySQL Service
+# -----------------------------
+apiVersion: v1                               # API version for Service
+kind: Service                                # We are creating a Service
+
+metadata:
+  name: mysql                                 # Name of the Service
+  namespace: roboshop                         # Belongs to 'roboshop' namespace
+
+spec:
+  selector:                                   # Service routes traffic to pods matching:
+    project: roboshop
+    component: mysql
+    tier: db
+
+  ports:
+    - protocol: TCP                            # MySQL uses TCP
+      port: 3306                               # Service port exposed inside the cluster
+      targetPort: 3306                         # Port exposed by MySQL container
+      # Default type = ClusterIP (internal access only)
