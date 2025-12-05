@@ -1,8 +1,12 @@
-🚀 How Traffic Really Flows in Kubernetes (EKS)
-Most people assume a LoadBalancer talks directly to a Service.
+# 🚀 How Traffic Really Flows in Kubernetes (EKS)
+
+ Most people assume a LoadBalancer talks directly to a Service.
  ❌ But that’s not how Kubernetes works.
 
-Here’s the real traffic path 👇
+Pic 1 
+![image](EKS.jpg)
+
+## Here’s the real traffic path 👇
 Client → Route53 → LoadBalancer → NodePort → kube-proxy → Service (ClusterIP) → Pods
 
 🔸 Client hits the Route53 DNS
