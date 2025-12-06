@@ -1,4 +1,4 @@
-# Roboshop Kubernetes Deployment – README
+# Roboshop Kubernetes Deployment 
 
 
 ## 📌 Deployment Order
@@ -36,6 +36,8 @@ kubectl get svc -A
 ```
 
 
-Pic 
+Pic: 
 
 ![image](roboshop.png)
+
+---
