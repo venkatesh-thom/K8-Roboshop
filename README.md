@@ -1,9 +1,5 @@
 # Roboshop Kubernetes Deployment – README
 
-This README contains the clean sequence of commands to deploy all Roboshop microservices to Kubernetes.
-
----
-
 
 ## 📌 Deployment Order
 
